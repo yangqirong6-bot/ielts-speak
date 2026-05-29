@@ -22,7 +22,7 @@ API_KEY = os.getenv("IELTS_API_KEY", os.getenv("OPENAI_API_KEY", ""))
 API_BASE = os.getenv("IELTS_API_BASE", os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"))
 MODEL = os.getenv("IELTS_MODEL", "gpt-4o-mini")
 TEMPERATURE = float(os.getenv("IELTS_TEMPERATURE", "0.7"))
-MAX_TOKENS = int(os.getenv("IELTS_MAX_TOKENS", "800"))
+MAX_TOKENS = int(os.getenv("IELTS_MAX_TOKENS", "2048"))
 
 # Output settings
 OUTPUT_DIR = Path(os.getenv("IELTS_OUTPUT_DIR", str(Path(__file__).parent.parent / "output")))

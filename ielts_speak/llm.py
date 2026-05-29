@@ -28,7 +28,7 @@ def _get_client():
     return _client
 
 
-def generate(word: str) -> str:
+def generate(word: str, user_thought: str = "") -> str:
     """Call the LLM and return the generated response text."""
     client = _get_client()
 
@@ -39,10 +39,60 @@ def generate(word: str) -> str:
             max_tokens=config.MAX_TOKENS,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": USER_PROMPT_TEMPLATE.format(word=word)},
+                {"role": "user", "content": USER_PROMPT_TEMPLATE.format(
+                    word=word,
+                    user_thought=user_thought or "（学生未提供具体思路，请根据词汇通用场景自由发挥）",
+                )},
             ],
         )
-        return response.choices[0].message.content
-
     except Exception as e:
-        raise LLMError(f"API call failed: {e}") from e
+        detail = str(e)
+        if hasattr(e, "status_code"):
+            detail = f"HTTP {e.status_code} — {detail}"
+        if hasattr(e, "response"):
+            try:
+                body = e.response.json()
+                detail = f"{detail}\nResponse body: {body}"
+            except Exception:
+                detail = f"{detail}\nResponse text: {e.response.text[:500]}"
+        raise LLMError(f"API call failed: {detail}") from e
+
+    content = response.choices[0].message.content
+    if not content:
+        finish = response.choices[0].finish_reason
+        raise LLMError(
+            f"API returned empty content (finish_reason={finish}). "
+            f"Model: {config.MODEL}. The model may have refused to answer."
+        )
+
+    return content
+
+
+def review_pronunciation(original: str, transcribed: str) -> str:
+    """Send original + transcribed text to LLM for pronunciation feedback."""
+    from .prompts import PRONUNCIATION_REVIEW_TEMPLATE
+
+    client = _get_client()
+
+    try:
+        response = client.chat.completions.create(
+            model=config.MODEL,
+            temperature=0.5,
+            max_tokens=500,
+            messages=[
+                {"role": "user", "content": PRONUNCIATION_REVIEW_TEMPLATE.format(
+                    original=original,
+                    transcribed=transcribed,
+                )},
+            ],
+        )
+    except Exception as e:
+        detail = str(e)
+        if hasattr(e, "status_code"):
+            detail = f"HTTP {e.status_code} — {detail}"
+        raise LLMError(f"Pronunciation review failed: {detail}") from e
+
+    content = response.choices[0].message.content
+    if not content:
+        raise LLMError("No pronunciation feedback received.")
+    return content
